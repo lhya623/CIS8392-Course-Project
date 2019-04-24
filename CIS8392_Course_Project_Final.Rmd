@@ -1,30 +1,218 @@
 ---
-title: "CIS8392_Course_Project_Final"
+title: "CIS8392 Course Project- Final"
 author: "Catresa Barlow and Wan-Ting Tsai"
-date: "05/01/2019"
+date: "5/1/2019"
 output: html_document
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(foreach)
+library(httr)
+library(jsonlite)
+library(readr)
+library(stringr)
+library(tidytext) 
+library(tidyverse)
+library(wordcloud)
 ```
 
-## R Markdown
+## Team Members
+Catresa Barlow &
+Wan-Ting Tsai
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+## Business Context
 
-```{r cars}
-summary(cars)
+
+
+
+## Problem Description
+Tobacco use among youth and young adults represents a major public health concern in the United States. “More than 95% of addicted smokers start before age 21”. Nicotine changes the receptor in the adolescent brain and creates lifelong addiction. (Preventing Tobacco Addiction Foundation, 2019). Although the use of conventional tobacco products by youth and young adults declined in recent decades, the Centers for Disease Control reports an increase in the use of “emerging tobacco products” like e-cigarettes among this population (Office of the Surgeon General, 2016).
+
+E-cigarettes entered the US markets in 2007 (Preventing Tobacco Addiction Foundation, 2019) and use among youth and young adults has increased steadily since the product’s introduction (Office of the Surgeon General, 2016). Sweet flavors like candy apple, bubble gum, marshmallow, cherry cola, smores, chocolate, orange soda, and taffy entice young people to try these products. Online availability of flavored tobacco products makes these products easily accessible by minors (Preventing Tobacco Addiction Foundation, 2019).
+
+Tobacco companies employ social media to market their products to youth and young adults. Cessation and prevention campaigns require an understanding of how this population communicates about and uses these products. We may gain insight into tobacco marketing and patterns of use by analyzing social media platforms. 
+
+## Data Summary, Exploration, and Discussion
+Our project focuses on smoking among youth and young adults. We wish to learn how tobacco companies communicate with this population and how this population communicates among itself on the subject of e-cigarettes. 
+Our team will use the RedditExtractoR API to collect our data. We will extract discussions from the following subreddits.
+<https://www.reddit.com/r/electronic_cigarette/>,
+<https://www.reddit.com/r/vaporents>
+
+## Analytics Plan
+Our team will use text mining techniques to surveil e-cigarettes users under 25 years of age who post content on Reddit. The goal is to understand how youth and young adults discuss topics of reasons for use, harm perception, frequency of use, flavorings, ad exposure, and quitting experience. 
+
+We will employ sentiment analysis algorithms (e.g. coreNLP, cleanNLP, sentimentr) to analysis positive and negative words/sentences used to describe e-cigarette products.
+We will also look at word frequencies to compare frequencies across different posts/discussions. We will analyze which words occur most often in discussions to identify emerging products and trends. 
+
+
+## Evaluation Plan
+
+Quantitatively:
+We will calculate a term's tf-idf analysis to measure the importance of various words used. By analyzing word importance, we can understand the language used to describe e-cigarettes and identify trends. We will use ggplot2 to visualize rank, term frequency, and the term frequency distribution. 
+For the sentiment analysis, we will calculate net sentiment of post/discussions and plot the results.
+
+Qualitatively:
+We will also graph the co-occurrence and correlation between words. This analysis will provide an understanding of e-cigarette use as well as foster discovery of new e-cigarette patterns or trends. We will visualize both types of relationships as networks using the ggraph package.
+
+AI/ML/NLP procedure summary
+##Start H20
+```{r initiate}
+h2o.init()
+
 ```
 
-## Including Plots
-
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
+```{r shutdown}
+h2o.clusterInfo()
+h2o.shutdown()
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+AI/ML/NLP result summary and discussion
+
+ 
+## Sample Code
+```{r explore}
+#load reddit comments
+reddit_comments <- read_csv("reddit_data.csv")
+
+#check for unique rows
+reddit_comments <- unique(reddit_comments)
+
+#restructure data frame
+reddit_df <- reddit_comments %>%
+  mutate(thread_id = str_c(link))%>%
+  mutate(comment_id = structure,
+         comment_score = as.numeric(comment_score)) %>%
+  select(thread_id, comment_id, post_date, comm_date, subreddit, author, 
+         user, comment_score, comment, title, post_text)
+
+#remove all non word characters
+reddit_df <-reddit_df %>%
+  mutate(comment = str_replace_all(comment,  "[d]<[0-9][0-9]>", " ")) %>%
+  mutate(comment = str_replace_all(comment,  "<[a-z][a-z]>", " ")) %>%
+  mutate(comment = str_replace_all(comment,  "<[0-9][0-9]>.[d]", " ")) %>%
+  mutate(comment = str_replace_all(comment,  "<[a-z][0-9]>", " ")) %>%
+  mutate(comment = str_replace_all(comment,  "<[0-9][a-z]>", " ")) %>%
+  mutate(comment = str_replace_all(comment,  "<[0-9][0-9]>", " ")) %>%
+  mutate(comment = str_replace_all(comment,  "\\Q< d\\E", " ")) %>%
+  mutate(comment = str_replace_all(comment,  "\\W", " ")) %>%
+  mutate(comment = str_replace_all(comment,  "ɰ", " "))
+
+#tokenize 
+tokens <- reddit_df %>%
+  unnest_tokens(output = word, input = comment) 
+tokens        
+
+tokens %>%
+  count(word,
+        sort = TRUE)
+
+get_stopwords()
+
+cleaned_tokens <- tokens %>% 
+  anti_join(get_stopwords())
+
+#to remove numbers
+nums <- cleaned_tokens %>% 
+  filter(str_detect(word, "^[0-9]")) %>% 
+  select(word) %>% unique()
+nums
+
+cleaned_tokens <- cleaned_tokens %>% 
+  anti_join(nums, by = "word")
+
+length(unique(cleaned_tokens$word))
+
+#to plot histogram
+cleaned_tokens %>%
+  count(word, sort = T) %>%
+  rename(word_freq = n) %>%
+  ggplot(aes(x=word_freq)) +
+  geom_histogram(aes(y=..count..), 
+                 color="black", 
+                 fill="blue", 
+                 alpha=0.3) + 
+  scale_x_continuous(breaks=c(0:5,10,100,500,10e3), 
+                     trans="log1p", 
+                     expand=c(0,0)) + 
+  scale_y_continuous(breaks=c(0,100,1000,5e3,10e3,5e4,10e4,4e4), 
+                     expand=c(0,0)) + 
+  theme_bw()
+
+#to remove rare words
+rare <- cleaned_tokens %>% 
+  count(word) %>% 
+  filter(n<10) %>% 
+  select(word) %>% 
+  unique()
+rare
+
+cleaned_tokens <- cleaned_tokens %>% 
+  anti_join(rare, by = "word")
+
+length(unique(cleaned_tokens$word))
+
+#wordcloud
+# define a nice color palette
+pal <- brewer.pal(8,"Dark2")
+# plot the 100 most common words
+cleaned_tokens %>%
+  count(word) %>%
+  with(wordcloud(word, n, random.order = FALSE, max.words = 100, colors=pal))
+
+#save csv
+write_csv((cleaned_tokens), 
+          (path = "cleaned_tokens.csv"))
+
+cleaned_tokens
+letters <- tibble("word" = cleaned_tokens$word, 
+                  "no_ltr" =nchar(cleaned_tokens$word))
+
+cleaned_tokens <- left_join(cleaned_tokens, letters)
+
+short <- cleaned_tokens %>%
+  nchar(word) %>%
+  filter(n<3)%>%
+  select(word) %>%
+  unique()
+
+
+```
+
+```{r alternate}
+#library(tidyverse)
+links <- reddit_urls(search_terms = "e-cigarette",
+                       subreddit = "electronic_cigarette",
+                       page_threshold = 1,
+                       sort_by = "new",
+                       wait_time = 2)
+
+reddit_df <- links %>%
+  URL %>% 
+  reddit_content 
+
+```
+
+
+```{r network}
+network_list <- target_df %>% user_network(include_author=FALSE, agg=TRUE)
+network_list$plot
+```
+
+```{r graph}
+
+my_url = "reddit.com/r/electronic_cigarette/comments/bafx7w/pennsylvania_vape_shop_owners_worry_they_are/"
+
+url_data = reddit_content(my_url)
+graph_object = construct_graph(url_data)
+graph_object
+
+```
+
+
+
+
+
+
